@@ -619,6 +619,11 @@ void PwsafeApp::ConfigurePollTimer()
   m_parentProcessId = getppid();
   m_pollTimer->Start(100);
   std::cout << "### ConfigurePollTimer - m_parentProcessId=" << m_parentProcessId << std::endl;
+  wxFile file(wxT("/home/rafael/OnParentProcess.txt"), wxFile::write_append);
+  if (file.IsOpened()) {
+      file.Write(wxString::Format("ConfigurePollTimer: m_parentProcessId=%d\n", m_parentProcessId));
+      file.Close();
+  }
 }
 
 void PwsafeApp::OnIdleTimer(wxTimerEvent &evt)
@@ -635,24 +640,35 @@ void PwsafeApp::OnIdleTimer(wxTimerEvent &evt)
  */
 void PwsafeApp::OnPollTimer(wxTimerEvent &evt)
 {
-  std::cout << "### OnPollTimer" << std::endl;
+  //std::cout << "### OnPollTimer" << std::endl;
 
   if (m_parentProcessId > 1) {
     if (kill(m_parentProcessId, 0) < 0) {
       switch (errno) {
         case EINVAL:
           // An invalid signal was specified.
-          std::cout << "### invalid signal" << std::endl;
+          //std::cout << "### invalid signal" << std::endl;
+          m_pollTimer->Stop();
           break;
         case EPERM:
           // The process does not have permission to send the signal to any of the target processes.
-          std::cout << "### no permissions to send signal to target process" << std::endl;
+          //std::cout << "### no permissions to send signal to target process" << std::endl;
+          m_pollTimer->Stop();
           break;
         case ESRCH:
-          // The pid or process group does not exist.
-          std::cout << "### process does not exist" << std::endl;
-          m_core.SafeUnlockCurFile();
+        {
+            // The pid or process group does not exist.
+            std::cout << "### process does not exist" << std::endl;
+            m_core.SafeUnlockCurFile();
+            
+            wxFile file(wxT("/home/rafael/OnParentProcess.txt"), wxFile::write_append);
+            if (file.IsOpened()) {
+                file.Write(wxT("OnParentProcess: died\n"));
+                file.Close();
+            }
+            m_pollTimer->Stop();
           break;
+        }
         default:
           ;//std::cout << "### process exists" << std::endl;
       }
