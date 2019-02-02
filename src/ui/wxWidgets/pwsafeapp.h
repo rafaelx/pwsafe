@@ -80,7 +80,9 @@ public:
 ////@end PwsafeApp member variables
 
   void OnIdleTimer(wxTimerEvent& timerEvent);
+  void OnPollTimer(wxTimerEvent& timerEvent);
   void ConfigureIdleTimer();
+  void ConfigurePollTimer();
   void RestartIdleTimer();
   void OnHelp(wxCommandEvent& evt);
   void OnDBGUIPrefsChange(wxEvent& evt);
@@ -96,9 +98,11 @@ public:
  private:
     PWScore m_core;
     wxTimer* m_idleTimer;
+    wxTimer* m_pollTimer;
     PasswordSafeFrame* m_frame;
-    enum { IDLE_TIMER_ID = 33 } ;
+    enum { IDLE_TIMER_ID = 33, POLL_TIMER_ID } ;
     CRecentDBList *m_recentDatabases;
+    int m_parentProcessId;
 
     //A map of dialog titles (or tab names) vs help sections
     WX_DECLARE_STRING_HASH_MAP( wxString, StringToStringMap );

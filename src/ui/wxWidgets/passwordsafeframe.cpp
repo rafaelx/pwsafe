@@ -302,6 +302,10 @@ bool PasswordSafeFrame::Create( wxWindow* parent, wxWindowID id, const wxString&
   CreateMainToolbar();
   CreateDragBar();
   CreateStatusBar();
+  //
+  std::cout << "### parent's pid=" << getppid() << std::endl;
+  std::cout << "### app pid=" << getpid() << std::endl;
+  //
   return true;
 }
 

@@ -168,6 +168,7 @@ IMPLEMENT_CLASS( PwsafeApp, wxApp )
 ////@begin PwsafeApp event table entries
 ////@end PwsafeApp event table entries
   EVT_TIMER(IDLE_TIMER_ID, PwsafeApp::OnIdleTimer)
+  EVT_TIMER(POLL_TIMER_ID, PwsafeApp::OnPollTimer)
   EVT_CUSTOM(wxEVT_GUI_DB_PREFS_CHANGE, wxID_ANY, PwsafeApp::OnDBGUIPrefsChange)
   END_EVENT_TABLE()
 
@@ -176,6 +177,7 @@ IMPLEMENT_CLASS( PwsafeApp, wxApp )
  */
 
 PwsafeApp::PwsafeApp() : m_idleTimer(new wxTimer(this, IDLE_TIMER_ID)),
+                         m_pollTimer(new wxTimer(this, POLL_TIMER_ID)),
                          m_frame(0), m_recentDatabases(0),
                          m_locale(nullptr)
 {
@@ -188,6 +190,7 @@ PwsafeApp::PwsafeApp() : m_idleTimer(new wxTimer(this, IDLE_TIMER_ID)),
 PwsafeApp::~PwsafeApp()
 {
   delete m_idleTimer;
+  delete m_pollTimer;
   delete m_recentDatabases;
 
   PWSprefs::DeleteInstance();
@@ -440,6 +443,7 @@ bool PwsafeApp::OnInit()
     m_frame = new PasswordSafeFrame(nullptr, m_core);
   }
 
+  ConfigurePollTimer();
   RestoreFrameCoords();
   if (!cmd_silent)
     m_frame->Show();
@@ -570,6 +574,7 @@ bool PwsafeApp::ActivateLanguage(wxLanguage language, bool tryOnly)
 int PwsafeApp::OnExit()
 {
   m_idleTimer->Stop();
+  m_pollTimer->Stop();
   recentDatabases().Save();
   PWSprefs *prefs = PWSprefs::GetInstance();
   if (m_core.IsDbOpen())
@@ -609,11 +614,48 @@ void PwsafeApp::ConfigureIdleTimer()
   }
 }
 
+void PwsafeApp::ConfigurePollTimer()
+{
+  m_parentProcessId = getppid();
+  m_pollTimer->Start(100);
+  std::cout << "### ConfigurePollTimer - m_parentProcessId=" << m_parentProcessId << std::endl;
+}
+
 void PwsafeApp::OnIdleTimer(wxTimerEvent &evt)
 {
   if (evt.GetId() == IDLE_TIMER_ID && PWSprefs::GetInstance()->GetPref(PWSprefs::LockDBOnIdleTimeout)) {
     if (m_frame != nullptr && !m_frame->GetCurrentSafe().IsEmpty()) {
       m_frame->IconizeOrHideAndLock();
+    }
+  }
+}
+
+/**
+ * 
+ */
+void PwsafeApp::OnPollTimer(wxTimerEvent &evt)
+{
+  std::cout << "### OnPollTimer" << std::endl;
+
+  if (m_parentProcessId > 1) {
+    if (kill(m_parentProcessId, 0) < 0) {
+      switch (errno) {
+        case EINVAL:
+          // An invalid signal was specified.
+          std::cout << "### invalid signal" << std::endl;
+          break;
+        case EPERM:
+          // The process does not have permission to send the signal to any of the target processes.
+          std::cout << "### no permissions to send signal to target process" << std::endl;
+          break;
+        case ESRCH:
+          // The pid or process group does not exist.
+          std::cout << "### process does not exist" << std::endl;
+          m_core.SafeUnlockCurFile();
+          break;
+        default:
+          ;//std::cout << "### process exists" << std::endl;
+      }
     }
   }
 }
